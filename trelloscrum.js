@@ -25,8 +25,13 @@ var _pointsAttr = ['cpoints', 'points'];
 
 
 //internals
-var reg = /((?:^|\s))\((\x3f|\d*\.?\d+)(\))\s?/m, //parse regexp- accepts digits, decimals and '?', surrounded by ()
+var reg  = /((?:^|\s))\((\x3f|\d*\.?\d+)(\))\s?/m, //parse regexp- accepts digits, decimals and '?', surrounded by ()
 	regC = /((?:^|\s))\[(\x3f|\d*\.?\d+)(\])\s?/m, //parse regexp- accepts digits, decimals and '?', surrounded by []
+	regColors = {
+		green:  /((?:^|\s))\{(\x3f|\d*\.?\d+)(\})\s?/m, //parse regexp- accepts digits, decimals and '?', surrounded by {}
+		red:    /((?:^|\s))\<(\x3f|\d*\.?\d+)(\>)\s?/m, //parse regexp- accepts digits, decimals and '?', surrounded by <>
+		yellow: /((?:^|\s))\*(\x3f|\d*\.?\d+)(\*)\s?/m, //parse regexp- accepts digits, decimals and '?', surrounded by **
+	},
 	iconUrl = chrome.extension.getURL('images/storypoints-icon.png'),
 	pointsDoneUrl = chrome.extension.getURL('images/points-done.png');
 
@@ -67,7 +72,19 @@ function computeTotal(){
 
 		for (var i in _pointsAttr){
 			var score = 0,
+				colorScores=[],
 				attr = _pointsAttr[i];
+			if(attr=='points'){
+				for (var colorReg in regColors){
+					colorScores[colorReg] = 0;
+				}
+				$('#board .list-total span[class^="points-"]').each(function(){
+					colorScores[$(this).attr('class').replace('points-','')]+=parseFloat(this.textContent)||0;
+				});
+				for (var colorReg in regColors){
+					$total.append('<span class="points-'+colorReg+'">'+(round(colorScores[colorReg])||'')+'</span>');
+				}
+			}
 			$('#board .list-total .'+attr).each(function(){
 				score+=parseFloat(this.textContent)||0;
 			});
@@ -119,13 +136,32 @@ function List(el){
 			$total.empty().appendTo($list.find('.list-title'));
 			for (var i in _pointsAttr){
 				var score=0,
+					colorScores=[],
 					attr = _pointsAttr[i];
+				if(attr=='points'){
+					for (var colorReg in regColors){
+						colorScores[colorReg] = 0;
+					}
+				}
 				$list.find('.list-card:not(.placeholder):visible').each(function(){
 					if(!this.listCard) return;
-					if(!isNaN(Number(this.listCard[attr].points)))score+=Number(this.listCard[attr].points)
+					//console.log(Object.keys(this.listCard[attr].colorPoints).length);
+					if(!isNaN(Number(this.listCard[attr].points)))score+=Number(this.listCard[attr].points);
+					if(attr=='points'){
+						for (var colorReg in regColors){
+							var colorScore = Number(this.listCard['points'].colorPoints[colorReg]);
+							if(!isNaN(colorScore))colorScores[colorReg]+=colorScore;
+						}
+					}
 				});
 				var scoreTruncated = round(score);
 				$total.append('<span class="'+attr+'">'+(scoreTruncated>0?scoreTruncated:'')+'</span>');
+				if(attr=='points'){
+					for (var colorReg in regColors){
+						var colorScoreTruncated = round(colorScores[colorReg]);
+						$total.append('<span class="points-'+colorReg+'">'+(colorScoreTruncated>0?colorScoreTruncated:'')+'</span>');
+					}
+				}
 				computeTotal();
 			}
 		});
@@ -150,9 +186,11 @@ function ListCard(el, identifier){
 	el.listCard[identifier]=this;
 
 	var points=-1,
+		//colorPoints=[],
 		consumed=identifier!=='points',
 		regexp=consumed?regC:reg,
 		parsed,
+		colorParsed=[],
 		that=this,
 		busy=false,
 		ptitle='',
@@ -160,6 +198,11 @@ function ListCard(el, identifier){
 		$badge=$('<div class="badge badge-points point-count" style="background-image: url('+iconUrl+')"/>'),
 		to,
 		to2;
+	this.colorPoints=[];
+	var $colorBadges=[];
+	for (var colorReg in regColors){
+		$colorBadges[colorReg]=$('<div class="badge badge-points-'+colorReg+' point-count" style="background-image: url('+iconUrl+')"/>');
+	}
 
 	this.refresh=function(){
 		if(busy) return;
@@ -174,6 +217,10 @@ function ListCard(el, identifier){
 				ptitle = title;
 				parsed=title.match(regexp);
 				points=parsed?parsed[2]:-1;
+				for (var colorReg in regColors){
+					colorParsed[colorReg]=title.match(regColors[colorReg]);
+					that.colorPoints[colorReg]=colorParsed[colorReg]?colorParsed[colorReg][2]:'';
+				}
 			}
 			clearTimeout(to2);
 			to2 = setTimeout(function(){
@@ -182,10 +229,21 @@ function ListCard(el, identifier){
 					[(consumed?'add':'remove')+'Class']('consumed')
 					.attr({title: 'This card has '+that.points+ (consumed?' consumed':'')+' storypoint' + (that.points == 1 ? '.' : 's.')})
 					.prependTo($card.find('.badges'));
+				if (!consumed) {
+					for (var colorReg in regColors){
+						$colorBadges[colorReg].text(that.colorPoints[colorReg])
+							.attr({title: 'This card has '+that.colorPoints[colorReg]+' '+colorReg+' storypoint'+(that.colorPoints[colorReg] == 1 ? '.' : 's.')})
+							.prependTo($card.find('.badges'));
+					}
+				}				
 
 				//only update title text and list totals once
 				if(!consumed) {
-					$title[0].childNodes[1].textContent = el._title = $.trim(el._title.replace(reg,'$1').replace(regC,'$1'));
+					var tempTitle = el._title.replace(reg,'$1').replace(regC,'$1');
+					for (var colorReg in regColors){
+						tempTitle = tempTitle.replace(regColors[colorReg],'$1');
+					}
+					$title[0].childNodes[1].textContent = el._title = $.trim(tempTitle);
 					var list = $card.closest('.list');
 					if(list[0]) list[0].list.calc();
 				}
@@ -197,6 +255,9 @@ function ListCard(el, identifier){
 	this.__defineGetter__('points',function(){
 		return parsed?points:''
 	});
+	// this.__defineGetter__('colorPoints',function(){
+	// 	return greenParsed?greenPoints:''
+	// });
 
 	if(!consumed) el.addEventListener('DOMNodeInserted',function(e){
 		if(/card-short-id/.test(e.target.className) && !busy)
