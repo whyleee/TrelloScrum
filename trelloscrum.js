@@ -621,7 +621,6 @@ function ListCard(el, identifier){
 	el.listCard[identifier]=this;
 
 	var points=-1,
-		//colorPoints=[],
 		consumed=identifier!=='points',
 		regexp=consumed?regC:reg,
 		parsed,
@@ -670,6 +669,34 @@ function ListCard(el, identifier){
 			for (var colorReg in regColors){
 				colorParsed[colorReg]=titleToParse.match(regColors[colorReg]);
 				that.colorPoints[colorReg]=colorParsed[colorReg]?colorParsed[colorReg][2]:'';
+			}
+
+			// count assigned points for persons
+			var isPersonCard = hasMember($card, titleTextContent);
+			var assignedPoints = 0;
+			if (isPersonCard) {
+				var personCardId = $card.find('.card-short-id').text().trim();
+				var personColor = points > 0 ? '' : Object.keys(that.colorPoints).filter(function(col) {return parseInt(that.colorPoints[col]) > 0;})[0]
+
+				$('.list-card').each(function() {
+					var $card = $(this);
+					var cardId = $card.find('.card-short-id').text().trim();
+					if (cardId != personCardId && hasMember($card, titleTextContent)) {
+						assignedPoints += parseInt($card.find('.badge-points' + (personColor ? '-' + personColor : '')).eq(0).text());
+					}
+				});
+
+				if (assignedPoints > 0) {
+					if (personColor) {
+						that.colorPoints[personColor] += '/' + assignedPoints;
+					} else {
+						points += '/' + assignedPoints;
+					}
+				}
+			}
+
+			function hasMember($card, member) {
+				return $.grep($card.find('.member-avatar'), function(memb) {return $(memb).attr('alt') && $(memb).attr('alt').indexOf(member) != -1;}).length > 0;
 			}
 
 			clearTimeout(to2);
