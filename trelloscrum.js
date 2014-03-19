@@ -21,7 +21,6 @@
 
 // Thanks @unscriptable - http://unscriptable.com/2009/03/20/debouncing-javascript-methods/
 var debounce = function (func, threshold, execAsap) {
-	//threshold *= 100000;
     var timeout;
     return function debounced () {
     	var obj = this, args = arguments;
@@ -628,13 +627,21 @@ function ListCard(el, identifier){
 		that=this,
 		busy=false,
 		$card=$(el),
-		$badge=$('<div class="badge badge-points point-count" style="background-image: url('+iconUrl+')"/>'),
+		$badge=$('<div class="badge badge-scrum badge-points point-count" style="background-image: url('+iconUrl+')"/>'),
 		to,
 		to2;
 	this.colorPoints=[];
 	var $colorBadges=[];
 	for (var colorReg in regColors){
-		$colorBadges[colorReg]=$('<div class="badge badge-points-'+colorReg+' point-count" style="background-image: url('+iconUrl+')"/>');
+		$colorBadges[colorReg]=$('<div class="badge badge-scrum badge-points-'+colorReg+' point-count" style="background-image: url('+iconUrl+')"/>');
+	}
+	var $personBadges={
+		'next': makeBadge(),
+		'curr': makeBadge()
+	};
+
+	function makeBadge(color) {
+		return $('<div class="badge badge-scrum badge-points point-count custom-badge" />');
 	}
 
 	// MutationObservers may send a bunch of similar events for the same card (also depends on browser) so
@@ -673,30 +680,41 @@ function ListCard(el, identifier){
 
 			// count assigned points for persons
 			var isPersonCard = hasMember($card, titleTextContent);
-			var assignedPoints = 0;
 			if (isPersonCard) {
-				var personCardId = $card.find('.card-short-id').text().trim();
-				var personColor = points > 0 ? '' : Object.keys(that.colorPoints).filter(function(col) {return parseInt(that.colorPoints[col]) > 0;})[0]
+				var personColor = points > 0 ? '' : Object.keys(that.colorPoints).filter(function(col) {return parseInt(that.colorPoints[col]) > 0;})[0];
+				var nextPoints = countPersonPoints($card, $('.list').eq(1));
+				var currPoints = countPersonPoints($card, $('.list').eq(2));
 
-				$('.list-card').each(function() {
-					var $card = $(this);
-					var cardId = $card.find('.card-short-id').text().trim();
-					if (cardId != personCardId && hasMember($card, titleTextContent)) {
-						assignedPoints += parseInt($card.find('.badge-points' + (personColor ? '-' + personColor : '')).eq(0).text());
-					}
-				});
+				$personBadges['next'].text(nextPoints > 0 ? 'N: ' + nextPoints : '');
+				$personBadges['curr'].text(currPoints > 0 ? 'C: ' + currPoints : '');
 
-				if (assignedPoints > 0) {
-					if (personColor) {
-						that.colorPoints[personColor] += '/' + assignedPoints;
-					} else {
-						points += '/' + assignedPoints;
-					}
+				for (var sprint in $personBadges) {
+					$personBadges[sprint].removeClass();
+
+					var sprintPoints = sprint == 'next' ? nextPoints : currPoints;
+					var isFree = points > 0 ? sprintPoints < points : sprintPoints < that.colorPoints[personColor];
+					$personBadges[sprint].addClass('badge badge-scrum badge-points-' + (isFree ? 'free' : 'full') + ' point-count custom-badge');
 				}
 			}
 
 			function hasMember($card, member) {
 				return $.grep($card.find('.member-avatar'), function(memb) {return $(memb).attr('alt') && $(memb).attr('alt').indexOf(member) != -1;}).length > 0;
+			}
+
+			function countPersonPoints($card, $list) {
+				var assignedPoints = 0;
+				var personCardId = $card.find('.card-short-id').text().trim();
+
+				$list.find('.list-card').each(function() {
+					var $card = $(this);
+					var cardId = $card.find('.card-short-id').text().trim();
+					if (cardId != personCardId && hasMember($card, titleTextContent)) {
+						var pointsTxt = $card.find('.badge-points' + (personColor ? '-' + personColor : '')).eq(0).text();
+						assignedPoints += pointsTxt ? parseInt(pointsTxt) : 0;
+					}
+				});
+
+				return assignedPoints;
 			}
 
 			clearTimeout(to2);
@@ -712,6 +730,9 @@ function ListCard(el, identifier){
 						$colorBadges[colorReg].text(that.colorPoints[colorReg])
 						$colorBadges[colorReg].attr({title: 'This card has '+that.colorPoints[colorReg]+' '+colorReg+' storypoint'+(that.colorPoints[colorReg] == 1 ? '.' : 's.')})
 							.prependTo($card.find('.badges'));
+					}
+					for (var sprint in $personBadges) {
+						$personBadges[sprint].prependTo($card.find('.badges'));
 					}
 				}				
 

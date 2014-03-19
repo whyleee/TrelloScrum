@@ -41,10 +41,7 @@
 	display: block !important;
 }
 
-.badge-points {
-	background-color: #006580 !important;
-	border-color: #005b72 !important;
-	border-bottom-color: #004b5f !important;
+.badge-scrum {
 	color: #e1fafb !important;
 	float: right;
 	font-size: 11px;
@@ -53,45 +50,40 @@
 	background-repeat: no-repeat !important;
 	background-position: 3px 3px !important;
 	padding: 0 4px 0 17px !important;
+	border-radius: 3px;
+}
+
+.badge-points {
+	background-color: #006580 !important;
+	border-color: #005b72 !important;
+	border-bottom-color: #004b5f !important;
 }
 .badge-points-green {
 	background-color: rgb(0, 128, 20) !important;
 	border-color: rgb(0, 114, 14) !important;
 	border-bottom-color: rgb(0, 95, 19) !important;
-	color: #e1fafb !important;
-	float: right;
-	font-size: 11px;
-	line-height: 16px;
-	text-align: right;
-	background-repeat: no-repeat !important;
-	background-position: 3px 3px !important;
-	padding: 0 4px 0 17px !important;
 }
 .badge-points-red {
 	background-color: rgb(128, 0, 0) !important;
 	border-color: rgb(114, 0, 0) !important;
 	border-bottom-color: rgb(95, 0, 0) !important;
-	color: #e1fafb !important;
-	float: right;
-	font-size: 11px;
-	line-height: 16px;
-	text-align: right;
-	background-repeat: no-repeat !important;
-	background-position: 3px 3px !important;
-	padding: 0 4px 0 17px !important;
 }
 .badge-points-yellow {
 	background-color: rgb(128, 128, 0) !important;
 	border-color: rgb(114, 109, 0) !important;
 	border-bottom-color: rgb(95, 91, 0) !important;
-	color: #e1fafb !important;
-	float: right;
-	font-size: 11px;
-	line-height: 16px;
-	text-align: right;
-	background-repeat: no-repeat !important;
-	background-position: 3px 3px !important;
-	padding: 0 4px 0 17px !important;
+}
+.badge-points-free {
+	background-color: rgb(150, 150, 150);
+	color: white !important;
+}
+.badge-points-full {
+	background-color: rgb(168, 99, 99);
+	color: white !important;
+}
+
+.custom-badge {
+	padding-left: 4px !important;
 }
 
 .picker {
@@ -119,7 +111,7 @@
 	cursor: pointer;
 }
 
-.badge-points:empty, .badge-points-green:empty, .badge-points-red:empty, .badge-points-yellow:empty {
+.badge-points:empty, .badge-points-green:empty, .badge-points-red:empty, .badge-points-yellow:empty, .custom-badge:empty {
 	display: none;
 }
 
