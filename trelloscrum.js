@@ -58,12 +58,12 @@ S4T_SETTING_DEFAULTS[SETTING_NAME_ESTIMATES] = _pointSeq.join();
 refreshSettings(); // get the settings right away (may take a little bit if using Chrome cloud storage)
 
 //internals
-var reg  = /((?:^|\s))\((\x3f|\d*\.?\d+)(\))\s?/m, //parse regexp- accepts digits, decimals and '?', surrounded by ()
-    regC = /((?:^|\s))\[(\x3f|\d*\.?\d+)(\])\s?/m, //parse regexp- accepts digits, decimals and '?', surrounded by []
+var reg  = /((?:^|\s))\((((\d*\.?\d+)\/)?(\x3f|\d*\.?\d+))(\))\s?/m, //parse regexp- accepts digits, decimals and '?', surrounded by ()
+    regC = /((?:^|\s))\[(((\d*\.?\d+)\/)?(\x3f|\d*\.?\d+))(\])\s?/m, //parse regexp- accepts digits, decimals and '?', surrounded by []
     regColors = {
-        green:  /((?:^|\s))\{(\x3f|\d*\.?\d+)(\})\s?/m, //parse regexp- accepts digits, decimals and '?', surrounded by {}
-        red:    /((?:^|\s))\<(\x3f|\d*\.?\d+)(\>)\s?/m, //parse regexp- accepts digits, decimals and '?', surrounded by <>
-        yellow: /((?:^|\s))\*(\x3f|\d*\.?\d+)(\*)\s?/m, //parse regexp- accepts digits, decimals and '?', surrounded by **
+        green:  /((?:^|\s))\{(((\d*\.?\d+)\/)?(\x3f|\d*\.?\d+))(\})\s?/m, //parse regexp- accepts digits, decimals and '?', surrounded by {}
+        red:    /((?:^|\s))\<(((\d*\.?\d+)\/)?(\x3f|\d*\.?\d+))(\>)\s?/m, //parse regexp- accepts digits, decimals and '?', surrounded by <>
+        yellow: /((?:^|\s))\*(((\d*\.?\d+)\/)?(\x3f|\d*\.?\d+))(\*)\s?/m, //parse regexp- accepts digits, decimals and '?', surrounded by **
     },
     iconUrl, pointsDoneUrl,
 	flameUrl, flame18Url,
@@ -531,19 +531,19 @@ function List(el){
 				}
 				$list.find('.list-card:not(.placeholder)').each(function(){
 					if(!this.listCard) return;
-					if(!isNaN(Number(this.listCard[attr].points))){
+					if(this.listCard[attr].points && !isNaN(Number(this.listCard[attr].points.estimate))){
 						// Performance note: calling :visible in the selector above leads to noticible CPU usage.
 						if(jQuery.expr.filters.visible(this)){
-							score+=Number(this.listCard[attr].points);
+							score+=Number(this.listCard[attr].points.estimate);
 						}
 					}
 					if(attr=='points'){
 						for (var colorReg in regColors){
-							var colorScore = Number(this.listCard['points'].colorPoints[colorReg]);
-							if(!isNaN(colorScore)){
+							var colorPointsText = this.listCard['points'].colorPoints[colorReg];
+							if(colorPointsText && !isNaN(Number(colorPointsText.estimate))){
     							// Performance note: calling :visible in the selector above leads to noticible CPU usage.
         						if(jQuery.expr.filters.visible(this)){
-		        					colorScores[colorReg]+=colorScore;
+		        					colorScores[colorReg]+=Number(colorPointsText.estimate);
 		        			    }
 		        			}
 						}
@@ -619,7 +619,7 @@ function ListCard(el, identifier){
 	}
 	el.listCard[identifier]=this;
 
-	var points=-1,
+	var points=null,
 		consumed=identifier!=='points',
 		regexp=consumed?regC:reg,
 		parsed,
@@ -665,23 +665,25 @@ function ListCard(el, identifier){
 			if(titleTextContent != parsedTitle){
 				// New card title, so we have to parse this new info to find the new amount of points.
 				parsed=titleTextContent.match(regexp);
-				points=parsed?parsed[2]:-1;
+				points=parsed?{estimate: parsed[5], spent: parsed[4]}:null;
 			} else {
 				// Title text has already been parsed... process the pre-parsed title to get the correct points.
 				var origTitle = $title.data('orig-title');
 				parsed=origTitle.match(regexp);
-				points=parsed?parsed[2]:-1;
+				points=parsed?{estimate: parsed[5], spent: parsed[4]}:null;
 			}
 			var titleToParse = titleTextContent != parsedTitle ? titleTextContent : $title.data('orig-title');
 			for (var colorReg in regColors){
 				colorParsed[colorReg]=titleToParse.match(regColors[colorReg]);
-				that.colorPoints[colorReg]=colorParsed[colorReg]?colorParsed[colorReg][2]:'';
+				that.colorPoints[colorReg]=colorParsed[colorReg]?{estimate: colorParsed[colorReg][5], spent: colorParsed[colorReg][4]}:null;
 			}
 
 			// count assigned points for persons
 			var isPersonCard = hasMember($card, titleTextContent);
 			if (isPersonCard) {
-				var personColor = points > 0 ? '' : Object.keys(that.colorPoints).filter(function(col) {return parseInt(that.colorPoints[col]) > 0;})[0];
+				var personColor = points != null ? '' : Object.keys(that.colorPoints).filter(function(col) {
+					return that.colorPoints[col] != null && parseInt(that.colorPoints[col].estimate) > 0;
+				})[0];
 				var nextPoints = countPersonPoints($card, $('.list').eq(1));
 				var currPoints = countPersonPoints($card, $('.list').eq(2));
 
@@ -692,7 +694,7 @@ function ListCard(el, identifier){
 					$personBadges[sprint].removeClass();
 
 					var sprintPoints = sprint == 'next' ? nextPoints : currPoints;
-					var isFree = points > 0 ? sprintPoints < points : sprintPoints < that.colorPoints[personColor];
+					var isFree = points != null ? sprintPoints < points.estimate : sprintPoints < that.colorPoints[personColor].estimate;
 					$personBadges[sprint].addClass('badge badge-scrum badge-points-' + (isFree ? 'free' : 'full') + ' point-count custom-badge');
 				}
 			}
@@ -710,6 +712,9 @@ function ListCard(el, identifier){
 					var cardId = $card.find('.card-short-id').text().trim();
 					if (cardId != personCardId && hasMember($card, titleTextContent)) {
 						var pointsTxt = $card.find('.badge-points' + (personColor ? '-' + personColor : '')).eq(0).text();
+						if (pointsTxt && pointsTxt.indexOf('/') != -1) {
+							pointsTxt = pointsTxt.split('/')[1];
+						}
 						assignedPoints += pointsTxt ? parseInt(pointsTxt) : 0;
 					}
 				});
@@ -717,18 +722,28 @@ function ListCard(el, identifier){
 				return assignedPoints;
 			}
 
+			function formatPoints(points) {
+				var text = '';
+				if (points) {
+					if (points.spent > 0) {
+						text += points.spent + '/';
+					}
+					text += points.estimate;
+				}
+				return text;
+			}
+
 			clearTimeout(to2);
 			to2 = setTimeout(function(){
 				// Add the badge (for this point-type: regular or consumed) to the badges div.
+				
 				$badge
-					.text(that.points)
+					.text(formatPoints(that.points))
 					[(consumed?'add':'remove')+'Class']('consumed')
-					.attr({title: 'This card has '+that.points+ (consumed?' consumed':'')+' storypoint' + (that.points == 1 ? '.' : 's.')})
 					.prependTo($card.find('.badges'));
 				if (!consumed) {
 					for (var colorReg in regColors){
-						$colorBadges[colorReg].text(that.colorPoints[colorReg])
-						$colorBadges[colorReg].attr({title: 'This card has '+that.colorPoints[colorReg]+' '+colorReg+' storypoint'+(that.colorPoints[colorReg] == 1 ? '.' : 's.')})
+						$colorBadges[colorReg].text(formatPoints(that.colorPoints[colorReg]))
 							.prependTo($card.find('.badges'));
 					}
 					for (var sprint in $personBadges) {
@@ -757,7 +772,7 @@ function ListCard(el, identifier){
 	};
 
 	this.__defineGetter__('points',function(){
-		return parsed?points:''
+		return parsed?points:null;
 	});
 	// this.__defineGetter__('colorPoints',function(){
 	// 	return greenParsed?greenPoints:''
