@@ -153,7 +153,6 @@ function initRefreshBtn() {
 }
 
 // Recalculates every card and its totals (used for significant DOM modifications).
-var recalcListAndTotal = debounce(_recalcListAndTotalInner, 500, false);
 var _recalcListAndTotalInner = function($el){
     ($el||$('.list')).each(function(){
 		if(!this.list) new List(this);
@@ -162,6 +161,7 @@ var _recalcListAndTotalInner = function($el){
 		}
 	})
 };
+var recalcListAndTotal = debounce(_recalcListAndTotalInner, 500, false);
 
 if (S4T_SETTINGS[SETTING_NAME_PERF] == 'auto') {
 var recalcTotalsObserver = new CrossBrowser.MutationObserver(function(mutations)
