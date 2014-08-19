@@ -266,9 +266,9 @@ function showBurndown()
     repositionBurndown();
 }
 
+var settingsFrameId = 'settingsFrame';
 function showSettings()
 {
-	var settingsFrameId = 'settingsFrame';
     $('body').addClass("window-up");
     $('.window').css("display", "block").css("top", "50px");
 
@@ -347,8 +347,8 @@ function showSettings()
 			e.preventDefault();
 
 			// Save the settings (persists them using Chrome cloud, LocalStorage, or Cookies - in that order of preference if available).
-			S4T_SETTINGS[SETTING_NAME_LINK_STYLE] = $('iframe').contents().find('input:radio[name='+burndownLinkSetting_radioName+']:checked').val();
-			S4T_SETTINGS[SETTING_NAME_ESTIMATES] = $('iframe').contents().find('#'+estimateFieldId).val();
+			S4T_SETTINGS[SETTING_NAME_LINK_STYLE] = $('#'+settingsFrameId).contents().find('input:radio[name='+burndownLinkSetting_radioName+']:checked').val();
+			S4T_SETTINGS[SETTING_NAME_ESTIMATES] = $('#'+settingsFrameId).contents().find('#'+estimateFieldId).val();
 
 			// Persist all settings.
 			$.each(S4T_ALL_SETTINGS, function(i, settingName){
@@ -425,17 +425,18 @@ function hideBurndown()
 
 function repositionBurndown()
 {
-    windowWidth = $(window).width();
-    if(windowWidth < 0) // todo change this to a n actual number (probably 710 or so)
-    {
-        // todo shrink our iframe to an appropriate size.  contents should wrap
-    }
-    else
-    {
-        burndownWindowWidth = 690;
-        leftPadding = (windowWidth - burndownWindowWidth) / 2.0;
-        $('.window').css("left", leftPadding);
-    }
+    // NOTE: With the most recent Trello update, I don't think we have to position the window manually anymore.
+    //windowWidth = $(window).width();
+    //if(windowWidth < 0) // todo change this to a n actual number (probably 710 or so)
+    //{
+    //    // todo shrink our iframe to an appropriate size.  contents should wrap
+    //}
+    //else
+    //{
+    //    burndownWindowWidth = 690;
+    //    leftPadding = (windowWidth - burndownWindowWidth) / 2.0;
+    //    $('.window').css("left", leftPadding);
+    //}
 }
 
 //calculate board totals
@@ -819,7 +820,7 @@ function showPointPicker(location) {
 	if($(location).find('.picker').length) return;
 	var $picker = $('<div/>', {class: "picker"}).appendTo('.card-detail-title .edit-controls');
 	
-	var estimateSequence = (S4T_SETTINGS[SETTING_NAME_ESTIMATES]).split(',');
+	var estimateSequence = (S4T_SETTINGS[SETTING_NAME_ESTIMATES].replace(/ /g, '')).split(',');
 	for (var i in estimateSequence) $picker.append($('<span>', {class: "point-value"}).text(estimateSequence[i]).click(function(){
 		var value = $(this).text();
 		var $text = $('.card-detail-title .edit textarea');
@@ -981,7 +982,7 @@ function refreshSettings(){
 
 function onSettingsUpdated(){
 	// Temporary indication to the user that the settings were saved (might not always be on screen, but that's not a problem).
-	$('iframe').contents().find('#s4tSaved').show().fadeOut(2000, "linear");
+	$('#'+settingsFrameId).contents().find('#s4tSaved').show().fadeOut(2000, "linear");
 	
 	// Refresh the links because link-settings may have changed.
 	$('.s4tLink').remove();
