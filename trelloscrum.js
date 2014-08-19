@@ -458,6 +458,9 @@ function computeTotal(){
 					colorScores[colorReg] = 0;
 				}
 				$('#board .list-total span[class^="points-"]').each(function(){
+					if ($(this).closest('.list').find('.list-header-name').is(':contains("[x]")')){
+						return;
+					}
 					colorScores[$(this).attr('class').replace('points-','')]+=parseFloat(this.textContent)||0;
 				});
 				for (var colorReg in regColors){
