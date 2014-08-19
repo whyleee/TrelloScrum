@@ -51,10 +51,12 @@ var _pointsAttr = ['cpoints', 'points'];
 var S4T_SETTINGS = [];
 var SETTING_NAME_LINK_STYLE = "burndownLinkStyle";
 var SETTING_NAME_ESTIMATES = "estimatesSequence";
-var S4T_ALL_SETTINGS = [SETTING_NAME_LINK_STYLE, SETTING_NAME_ESTIMATES];
+var SETTING_NAME_PERF = "perfBoardUpdate";
+var S4T_ALL_SETTINGS = [SETTING_NAME_LINK_STYLE, SETTING_NAME_ESTIMATES, SETTING_NAME_PERF];
 var S4T_SETTING_DEFAULTS = {};
 S4T_SETTING_DEFAULTS[SETTING_NAME_LINK_STYLE] = 'full';
 S4T_SETTING_DEFAULTS[SETTING_NAME_ESTIMATES] = _pointSeq.join();
+S4T_SETTING_DEFAULTS[SETTING_NAME_PERF] = 'auto';
 refreshSettings(); // get the settings right away (may take a little bit if using Chrome cloud storage)
 
 //internals
@@ -66,7 +68,7 @@ var reg  = /((?:^|\s))\((((\d*\.?\d+)\/)?(\x3f|\d*\.?\d+))(\))\s?/m, //parse reg
         yellow: /((?:^|\s))\*(((\d*\.?\d+)\/)?(\x3f|\d*\.?\d+))(\*)\s?/m, //parse regexp- accepts digits, decimals and '?', surrounded by **
     },
     iconUrl, pointsDoneUrl,
-	flameUrl, flame18Url,
+	flameUrl, flame18Url, refreshIconUrl,
 	scrumLogoUrl, scrumLogo18Url;
 if(typeof chrome !== 'undefined'){
     // Works in Chrome
@@ -74,6 +76,7 @@ if(typeof chrome !== 'undefined'){
 	pointsDoneUrl = chrome.extension.getURL('images/points-done.png');
     flameUrl = chrome.extension.getURL('images/burndown_for_trello_icon_12x12.png');
     flame18Url = chrome.extension.getURL('images/burndown_for_trello_icon_18x18.png');
+    refreshIconUrl = chrome.extension.getURL('images/refresh-icon.png');
 	scrumLogoUrl = chrome.extension.getURL('images/trello-scrum-icon_12x12.png');
 	scrumLogo18Url = chrome.extension.getURL('images/trello-scrum-icon_18x18.png');
 } else if(navigator.userAgent.indexOf('Safari') != -1){ // Chrome defines both "Chrome" and "Safari", so this test MUST be done after testing for Chrome
@@ -82,6 +85,7 @@ if(typeof chrome !== 'undefined'){
 	pointsDoneUrl = safari.extension.baseURI + 'images/points-done.png';
     flameUrl = safari.extension.baseURI + 'images/burndown_for_trello_icon_12x12.png';
     flame18Url = safari.extension.baseURI + 'images/burndown_for_trello_icon_18x18.png';
+    refreshIconUrl = safari.extension.baseURI + 'images/refresh-icon.png';
 	scrumLogoUrl = safari.extension.baseURI + 'images/trello-scrum-icon_12x12.png';
 	scrumLogo18Url = safari.extension.baseURI + 'images/trello-scrum-icon_18x18.png';
 } else {
@@ -91,6 +95,7 @@ if(typeof chrome !== 'undefined'){
 		pointsDoneUrl = self.options.pointsDoneUrl;
         flameUrl = self.options.flameUrl;
         flame18Url = self.options.flame18Url;
+        refreshIconUrl = self.options.refreshIconUrl;
 		scrumLogoUrl = self.options.scrumLogoUrl;
 		scrumLogo18Url = self.options.scrumLogo18Url;
 	}
@@ -131,16 +136,34 @@ $(function(){
 	calcListPoints();
 });
 
+setInterval(initRefreshBtn, 1000);
+
+function initRefreshBtn() {
+	if ($('#s4tRefresh').length == 0) {
+		var $updateBtn = $("<a id='s4tRefresh' class='board-header-btn dark-hover' href='#'>" +
+			"<span class='icon-sm board-header-btn-icon'><img src='"+refreshIconUrl+"' width='12' height='12'/></span>" +
+			"<span class='board-header-btn-text'>Refresh</span>" +
+			"</a>");
+		$updateBtn.click(function() {
+			_recalcListAndTotalInner();
+		});
+		$('.board-header-btns.left').last().after($updateBtn);
+		clearInterval(initRefreshBtn);
+	}
+}
+
 // Recalculates every card and its totals (used for significant DOM modifications).
-var recalcListAndTotal = debounce(function($el){
+var recalcListAndTotal = debounce(_recalcListAndTotalInner, 500, false);
+var _recalcListAndTotalInner = function($el){
     ($el||$('.list')).each(function(){
 		if(!this.list) new List(this);
 		else if(this.list.refreshList){
 			this.list.refreshList(); // make sure each card's points are still accurate (also calls list.calc()).
 		}
 	})
-}, 500, false);
+};
 
+if (S4T_SETTINGS[SETTING_NAME_PERF] == 'auto') {
 var recalcTotalsObserver = new CrossBrowser.MutationObserver(function(mutations)
 {	
 	// Determine if the mutation event included an ACTUAL change to the list rather than
@@ -188,6 +211,7 @@ var recalcTotalsObserver = new CrossBrowser.MutationObserver(function(mutations)
     }
 });
 recalcTotalsObserver.observe(document.body, obsConfig);
+}
 
 // Refreshes the link to the Burndown Chart dialog.
 function updateBurndownLink(){
@@ -282,6 +306,7 @@ function showSettings()
 		// Load the current settings (with defaults in case Settings haven't been set).
 		var setting_link = S4T_SETTINGS[SETTING_NAME_LINK_STYLE];
 		var setting_estimateSeq = S4T_SETTINGS[SETTING_NAME_ESTIMATES];
+		var setting_perf = S4T_SETTINGS[SETTING_NAME_PERF];
 	
 		var settingsDiv = $('<div/>', {style: "padding:0px 10px;font-family:'Helvetica Neue', Arial, Helvetica, sans-serif;"});
 		var iframeHeader = $('<h3/>', {style: 'text-align: center;'});
@@ -343,12 +368,35 @@ function showSettings()
 											});
 			fieldset_estimateButtons.append(restoreDefaultsButton);
 
+		// Performance optimizations
+		var fieldset_perf = $('<fieldset/>');
+		var legend_perf = $('<legend/>');
+		legend_perf.text("Board update (seriously affects Trello performance)");
+		var perfSetting_radioName = 'perfSetting';
+		fieldset_perf.append(legend_perf);
+			var perfRadio_auto = $('<input/>', {type: 'radio', name: perfSetting_radioName, id: 'perf_auto', value: 'auto'});
+			if(setting_perf == 'auto'){
+				perfRadio_auto.prop('checked', true);
+			}
+			var label_auto = $('<label/>', {for: 'perf_auto'});
+			label_auto.text('Real-time (slow)');
+			fieldset_perf.append(perfRadio_auto).append(label_auto).append("<br/>");
+
+			var perfRadio_manual = $('<input/>', {type: 'radio', name: perfSetting_radioName, id: 'perf_manual', value: 'manual'});
+			if(setting_perf == 'manual'){
+				perfRadio_manual.prop('checked', true);
+			}
+			var label_manual = $('<label/>', {for: 'perf_manual'});
+			label_manual.text('Manual (fast)');
+			fieldset_perf.append(perfRadio_manual).append(label_manual).append("<br/>");
+
 		var saveButton = $('<button/>', {style:'margin-top:5px'}).text('Save Settings').click(function(e){
 			e.preventDefault();
 
 			// Save the settings (persists them using Chrome cloud, LocalStorage, or Cookies - in that order of preference if available).
 			S4T_SETTINGS[SETTING_NAME_LINK_STYLE] = $('#'+settingsFrameId).contents().find('input:radio[name='+burndownLinkSetting_radioName+']:checked').val();
 			S4T_SETTINGS[SETTING_NAME_ESTIMATES] = $('#'+settingsFrameId).contents().find('#'+estimateFieldId).val();
+			S4T_SETTINGS[SETTING_NAME_PERF] = $('#'+settingsFrameId).contents().find('input:radio[name='+perfSetting_radioName+']:checked').val();
 
 			// Persist all settings.
 			$.each(S4T_ALL_SETTINGS, function(i, settingName){
@@ -364,6 +412,7 @@ function showSettings()
 		// Set up the form (all added down here to be easier to change the order).
 		settingsForm.append(fieldset_burndownLink);
 		settingsForm.append(fieldset_estimateButtons);
+		settingsForm.append(fieldset_perf);
 		settingsForm.append(saveButton);
 		settingsForm.append(savedIndicator);
 	}
@@ -572,6 +621,7 @@ function List(el){
             this.calc(); // readCard will call this.calc() if any of the cards get refreshed.
     }, 500, false);
 
+	if (S4T_SETTINGS[SETTING_NAME_PERF] == 'auto') {
 	var cardAddedRemovedObserver = new CrossBrowser.MutationObserver(function(mutations)
 	{
 		// Determine if the mutation event included an ACTUAL change to the list rather than
@@ -606,6 +656,7 @@ function List(el){
 	});
 
     cardAddedRemovedObserver.observe($list.get(0), obsConfig);
+	}
 
 	setTimeout(function(){
 		readCard($list.find('.list-card'));
@@ -782,6 +833,7 @@ function ListCard(el, identifier){
 	// 	return greenParsed?greenPoints:''
 	// });
 
+	if (S4T_SETTINGS[SETTING_NAME_PERF] == 'auto') {
 	var cardShortIdObserver = new CrossBrowser.MutationObserver(function(mutations){
 		$.each(mutations, function(index, mutation){
 			var $target = $(mutation.target);
@@ -813,6 +865,7 @@ function ListCard(el, identifier){
 	if(!consumed){
 		var observerConfig = { childList: true, characterData: false, attributes: false, subtree: true };
 		cardShortIdObserver.observe(el, observerConfig);
+	}
 	}
 
 	setTimeout(that.refresh);
