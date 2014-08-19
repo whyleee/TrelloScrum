@@ -685,8 +685,8 @@ function ListCard(el, identifier){
 				var personColor = points != null ? '' : Object.keys(that.colorPoints).filter(function(col) {
 					return that.colorPoints[col] != null && parseInt(that.colorPoints[col].estimate) > 0;
 				})[0];
-				var nextPoints = countPersonPoints($card, $('.list').eq(1));
-				var currPoints = countPersonPoints($card, $('.list').eq(2));
+				var nextPoints = countPersonPoints($card, $('.list').find('.list-header-name:contains("[Next]")').closest('.list'));
+				var currPoints = countPersonPoints($card, $('.list').find('.list-header-name:contains("[Current]")').closest('.list'));
 
 				$personBadges['next'].text(nextPoints > 0 ? 'N: ' + nextPoints : '');
 				$personBadges['curr'].text(currPoints > 0 ? 'C: ' + currPoints : '');
